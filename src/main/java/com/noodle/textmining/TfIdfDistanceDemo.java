@@ -64,8 +64,8 @@ public class TfIdfDistanceDemo {
 		List<TfidfWord> keywords = new ArrayList<TfidfWord>();
 		for (String term : tfIdf.termSet()) {
 			// System.out.print(term + " ");
-			keywords.add(new TfidfWord(term, tfIdf.docFrequency(term)
-					* tfIdf.idf(term)));
+			keywords.add(new TfidfWord(
+					term, tfIdf.docFrequency(term) * tfIdf.idf(term)));
 		}
 
 		// Write keywords to the file

@@ -67,7 +67,7 @@ public class ProcessChinese {
 	}
 
 	public void run() throws IOException {
-		for (ODocument doc : db.browseClass("Thread")) {
+		for (ODocument doc : db.browseClass("Doc")) {
 			System.out.println(doc.getIdentity());
 			String text = doc.field("text"); // retrieve text from database
 

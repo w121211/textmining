@@ -66,15 +66,15 @@ public class BasicCrawler extends WebCrawler {
 				page.getParseData() instanceof HtmlParseData) {
 			HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
 			Document dom = Jsoup.parse(htmlParseData.getHtml());
-			Elements posts = dom.select("div.single-post-content");
+			Elements elements = dom.select("div.single-post-content");
 			
 			String text = "";
-			for (Element p : posts) {
-				text += p.text() + "\n=====\n";
+			for (Element e : elements) {
+				text += e.text() + "\n=====\n";
 			}
 			
 			ODatabaseRecordThreadLocal.INSTANCE.set(db);
-			ODocument doc = new ODocument("Thread");
+			ODocument doc = new ODocument("Doc");
 			doc.field("url", url);
 			doc.field("text", text);
 			doc.save();
