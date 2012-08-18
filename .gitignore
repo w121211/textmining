@@ -1,0 +1,9 @@
+<span class="goog_qs-tidbit goog_qs-tidbit-0">#java specific
+*.class
+
+## generic files to ignore
+*~
+*.lock
+*.swp
+*.DS_Store
+*.out
