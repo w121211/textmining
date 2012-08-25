@@ -1,4 +1,4 @@
-package com.noodle.textmining;
+package com.noodle.textmining.core;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -22,7 +22,7 @@ import edu.stanford.nlp.ie.crf.CRFClassifier;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.tagger.maxent.MaxentTagger;
 
-public class ProcessChinese {
+public class ChineseDocProcessor {
 
 	private static Properties prop;
 	public static ODatabaseDocumentTx db;
@@ -31,7 +31,7 @@ public class ProcessChinese {
 	public CRFClassifier<CoreLabel> classifier;
 	public JChineseConvertor chineseConverter;
 
-	public ProcessChinese() throws Exception {
+	public ChineseDocProcessor() throws Exception {
 		// load a properties file
 		prop = new Properties();
 		prop.load(new FileInputStream("config.properties"));
@@ -61,37 +61,42 @@ public class ProcessChinese {
 	}
 
 	public static void main(String[] args) throws Exception {
-		new ProcessChinese().run();
+		new ChineseDocProcessor().run();
 		System.out.println("Text process completed");
 		db.close();
 	}
 
 	public void run() throws IOException {
-		for (ODocument doc : db.browseClass("Doc")) {
+		for (ODocument doc : db.browseClass("Thread")) {
 			System.out.println(doc.getIdentity());
-			String text = doc.field("text"); // retrieve text from database
-
-			// transfer text to simplified Chinese
-			text = chineseConverter.t2s(text);
-
-			// MMSeg segmentation
-			// String segText = segWords(text, " ");
-
-			// stanford segmentation
-			List<String> segList = classifier.segmentString(text);
 			
-			// POS tagging
-			String segText = "";
-			for (String s : segList)
-				if (!s.isEmpty())
-					segText += s + " ";
-			String posText = tagger.tagString(segText);
+			String[] fieldNames = {"text", "title"};
+			
+			for (String fieldName : fieldNames) {
+				String text = doc.field(fieldName);
+				
+				// transfer text to simplified Chinese
+				text = chineseConverter.t2s(text);
 
-			// Save to database
-			doc.field("text_simp", text);
-			doc.field("seg_text_simp", segText);
-			doc.field("pos_text_simp", posText);
-			doc.save();
+				// MMSeg segmentation
+				// String segText = segWords(text, " ");
+
+				// stanford segmentation
+				List<String> segList = classifier.segmentString(text);
+				
+				// POS tagging
+				String segText = "";
+				for (String s : segList)
+					if (!s.isEmpty())
+						segText += s + " ";
+				String posText = tagger.tagString(segText);
+
+				// Save to database
+				doc.field(fieldName + "_simp", text);
+				doc.field("seg_" + fieldName + "_simp", segText);
+				doc.field("pos_" + fieldName + "_simp", posText);
+				doc.save();
+			}
 		}
 	}
 

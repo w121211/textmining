@@ -1,4 +1,4 @@
-package com.noodle.textmining;
+package com.noodle.textmining.core;
 
 import java.io.FileInputStream;
 import java.util.Properties;
@@ -9,7 +9,7 @@ import edu.uci.ics.crawler4j.fetcher.PageFetcher;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 
-import com.noodle.textmining.BasicCrawler;
+import com.noodle.textmining.core.BasicCrawler;
 
 public class BasicCrawlController {
 

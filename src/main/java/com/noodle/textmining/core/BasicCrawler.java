@@ -1,4 +1,4 @@
-package com.noodle.textmining;
+package com.noodle.textmining.core;
 
 import java.util.List;
 import java.util.Properties;
