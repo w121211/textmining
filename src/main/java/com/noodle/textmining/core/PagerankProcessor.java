@@ -7,7 +7,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,18 +15,12 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
-import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
 import org.jgrapht.ext.ComponentAttributeProvider;
 import org.jgrapht.ext.DOTExporter;
-import org.jgrapht.ext.GmlExporter;
 import org.jgrapht.ext.IntegerEdgeNameProvider;
 import org.jgrapht.ext.IntegerNameProvider;
-import org.jgrapht.ext.StringNameProvider;
-import org.jgrapht.ext.VertexNameProvider;
-import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
-import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
@@ -36,7 +29,7 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 public class PagerankProcessor {
 
 	public static void main(String[] args) throws FileNotFoundException,
-			IOException {
+	IOException {
 		PagerankProcessor app = new PagerankProcessor();
 		app.run();
 		System.out.println("done!");
@@ -54,7 +47,6 @@ public class PagerankProcessor {
 				"admin");
 
 		// Read relation map from database
-		List<String> termList = new ArrayList<String>();
 		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
 		for (ODocument doc : db.browseClass("Term")) {
 			String term = doc.field("term");
@@ -66,10 +58,8 @@ public class PagerankProcessor {
 				.getTermGraph(maps);
 		g = this.computePagerank(g);
 
-		// System.out.println(g);
-
 		BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream("log/relation_graph.dot")));
+				new FileOutputStream(prop.getProperty("EXPORT_DIR") + "relation_graph.dot")));
 		this.exportGraph(writer, g);
 	}
 
@@ -78,8 +68,7 @@ public class PagerankProcessor {
 
 		// Create relation graph
 		Map<String, TermVertex> map = new HashMap<String, TermVertex>();
-		DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge> g = 
-				new DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge>(
+		DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge> g = new DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge>(
 				DefaultWeightedEdge.class);
 		for (String term : termRelationMap.keySet()) {
 			TermVertex v = new TermVertex(term);
@@ -111,11 +100,14 @@ public class PagerankProcessor {
 		double damping = 0.85;
 		while (iteration-- >= 0) {
 			for (TermVertex i : g.vertexSet()) {
-				Set<DefaultWeightedEdge> edges = g.incomingEdgesOf(i);
 				double sigma = 0D;
-				for (DefaultWeightedEdge e : edges) {
-					TermVertex j = g.getEdgeSource(e);
-					sigma += j.getPagerank() / g.outDegreeOf(j);
+				for (DefaultWeightedEdge ej : g.incomingEdgesOf(i)) {
+					TermVertex j = g.getEdgeSource(ej);
+					double dependenceSum = 0D;
+					for (DefaultWeightedEdge ek : g.outgoingEdgesOf(j))
+						dependenceSum += g.getEdgeWeight(ek);
+//					sigma += j.getPagerank() / g.outDegreeOf(j);
+					sigma += j.getPagerank() * (g.getEdgeWeight(ej) / dependenceSum);
 				}
 				double pr = (1d - damping) / n + damping * sigma;
 				i.setTempPagerank(pr);
@@ -127,28 +119,28 @@ public class PagerankProcessor {
 		return g;
 	}
 
-	public void exportGraph(Writer writer, Graph g)
+	public void exportGraph(Writer writer, final Graph g)
 			throws FileNotFoundException {
-		ComponentAttributeProvider<TermVertex> vertexAttributeProvider = 
-				new ComponentAttributeProvider<TermVertex>() {
+		ComponentAttributeProvider<TermVertex> vertexAttributeProvider = new ComponentAttributeProvider<TermVertex>() {
 			public Map<String, String> getComponentAttributes(TermVertex v) {
 				Map<String, String> map = new HashMap<String, String>();
 				map.put("label", v.getTerm());
-				map.put("weight", String.format("%.4f", v.getPagerank()));
+				map.put("depend_pagerank", String.format("%.4f", v.getPagerank()));
 				return map;
 			}
 		};
-
-		DOTExporter<TermVertex, DefaultWeightedEdge> exporter = 
-				new DOTExporter<TermVertex, DefaultWeightedEdge>(
-				new IntegerNameProvider<TermVertex>(), null, new IntegerEdgeNameProvider<DefaultWeightedEdge>(),
-				vertexAttributeProvider, null);
+		ComponentAttributeProvider<DefaultWeightedEdge> edgeAttributeProvider = new ComponentAttributeProvider<DefaultWeightedEdge>() {
+			public Map<String, String> getComponentAttributes(DefaultWeightedEdge e) {
+				Map<String, String> map = new HashMap<String, String>();
+				map.put("Weight", Double.toString(g.getEdgeWeight(e)));
+				return map;
+			}
+		};
+		DOTExporter<TermVertex, DefaultWeightedEdge> exporter = new DOTExporter<TermVertex, DefaultWeightedEdge>(
+				new IntegerNameProvider<TermVertex>(), null,
+				new IntegerEdgeNameProvider<DefaultWeightedEdge>(),
+				vertexAttributeProvider, edgeAttributeProvider);
 		exporter.export(writer, g);
-
-		// Output graph
-//		GmlExporter<String, DefaultEdge> exporter = new GmlExporter<String, DefaultEdge>();
-//		exporter.setPrintLabels(GmlExporter.PRINT_EDGE_VERTEX_LABELS);
-//		exporter.export(writer, g);
 	}
 }
 
@@ -188,6 +180,6 @@ class TermVertex {
 	}
 
 	public String toString() {
-		return String.format("%s[%.4f]", term, pagerank);
+		return String.format("%s[%.6f]", term, pagerank);
 	}
 }

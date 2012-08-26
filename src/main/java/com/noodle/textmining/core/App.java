@@ -14,8 +14,6 @@ public class App {
 		
 		int iteration = 100;
 		while (--iteration >= 0) {
-//			double a = map.get("A") * 0.2 + map.get("C") * 0.2;
-//			double c = map.get("A") * 0.8 + map.get("C") * 0.8;
 			double a = map.get("A") * 0.1 + map.get("B") * 0.1 + map.get("C") * 0.2;
 			double b = map.get("A") * 0.45 + map.get("B") * 0.9;
 			double c = map.get("A") * 0.45 + map.get("C") * 0.8;

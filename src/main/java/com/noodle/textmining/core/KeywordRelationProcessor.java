@@ -6,10 +6,12 @@ import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,21 +21,24 @@ import java.util.Properties;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
-public class KeywordRelationProcessor { 
-	
-	public static void main(String[] args) throws FileNotFoundException, IOException {
+public class KeywordRelationProcessor {
+
+	public static void main(String[] args) throws FileNotFoundException,
+			IOException {
 		KeywordRelationProcessor processor = new KeywordRelationProcessor();
 		processor.run();
-//		processor.test();
+		// processor.test();
+		System.out.println("done!");
 	}
-	
+
 	public void test() throws FileNotFoundException, IOException {
-		
+
 		Properties prop = new Properties();
 		prop.load(new FileInputStream("config.properties"));
 		ODatabaseDocumentTx db;
-		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin", "admin");
-		
+		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
+				"admin");
+
 		ODocument doc = new ODocument("Test");
 		Map<String, Double> t1 = new HashMap<String, Double>();
 		t1.put("t2", 0.2);
@@ -41,7 +46,7 @@ public class KeywordRelationProcessor {
 
 		doc.field("term", t1);
 		doc.save();
-		
+
 		for (ODocument d : db.browseClass("Test")) {
 			System.out.print(d.fieldType("term"));
 			System.out.println(d.field("term"));
@@ -49,10 +54,9 @@ public class KeywordRelationProcessor {
 			System.out.println(m.get("t2"));
 			System.out.println(m.get("t3"));
 		}
-		
 		db.close();
 	}
-	
+
 	public void run() throws FileNotFoundException, IOException {
 		// load a properties file
 		Properties prop = new Properties();
@@ -60,74 +64,77 @@ public class KeywordRelationProcessor {
 
 		// connect to database
 		ODatabaseDocumentTx db;
-		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin", "admin");
+		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
+				"admin");
 		
 		// read terms from file
 		BufferedReader reader = new BufferedReader(new InputStreamReader(
 				new DataInputStream(new FileInputStream(
 						"/Users/chi/Downloads/udn-tkeywords-selected.txt"))));
-		List<String> list = new ArrayList<String>();
-		String str;
-		while ((str = reader.readLine()) != null) {
-//			if (str.contains("*"))
-			if (str.indexOf(":") > 0) {
-				String s = str.substring(0, str.indexOf(":"));
-				if (s.length() > 1 && !s.contains("/"))
-					list.add(s);
-			}
-		}
-		String[] terms = list.toArray(new String[list.size()]);
-		
+		String[] terms = this.getTermsFromFile(reader);
+
 		// read docs from database
-		list = new ArrayList<String>();
+		List<String> list = new ArrayList<String>();
 		for (ODocument doc : db.browseClass("Thread"))
 			list.add((String) doc.field("title"));
 		String[] docs = list.toArray(new String[list.size()]);
-		
-		// calculate the relation matrix
-//		double[][] matrix = this.getRelationMatrix(docs, terms);
-		
-		// out
-//		PrintWriter writer = new PrintWriter(new BufferedWriter(
-//				new OutputStreamWriter(
-//				new FileOutputStream("log/relation_matrix.csv"), "UTF-8")));
-//		this.out(writer, matrix, terms, terms);
-		
-		// save to database
-		for (Map.Entry<String, Map<String, Double>> e : 
-			getRelationMap(docs, terms).entrySet()) {
+
+		// Compute relation map and save to database
+		for (Map.Entry<String, Map<String, Double>> e : this.getRelationMap(docs,
+				terms).entrySet()) {
 			ODocument doc = new ODocument("Term");
-			
+
 			doc.field("term", e.getKey());
-		    doc.field("term_map", e.getValue());
-		    doc.save();
+			doc.field("term_map", e.getValue());
+			doc.save();
 		}
 		db.close();
-		
-		System.out.println("done!");
 	}
-	
-	/*
-	 * TODO bug
-	 * terms: 專家, 家 cause to count twice 
+
+	/**
+	 * 
+	 * @param reader
+	 * @return terms
+	 * @throws IOException 
 	 */
-	public Map<String, Map<String, Double>> getRelationMap(
-			String[] docs, String[] terms) {
-		
-		Map<String, Map<String, Double>> maps = 
-				new HashMap<String, Map<String, Double>>();
+	public String[] getTermsFromFile(BufferedReader reader) throws IOException {
+		// read terms from file
+		List<String> list = new ArrayList<String>();
+		String str;
+		while ((str = reader.readLine()) != null) {
+			if (str.indexOf(":") > 0) {
+				String s = str.substring(0, str.indexOf(":"));
+				if (s.length() > 1 && s.matches("[\\S&&[^╱]]{2,}?"))
+					list.add(s);
+			}
+		}
+		return list.toArray(new String[list.size()]);
+	}
+
+	/**
+	 * TODO bug terms: 專家, 家 cause to count twice
+	 * @param docs
+	 * @param terms
+	 * @return
+	 */
+	public Map<String, Map<String, Double>> getRelationMap(String[] docs,
+			String[] terms) {
+		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
 		for (int i = 0; i < terms.length; i++) {
-			Map<String, Double> map  = new HashMap<String, Double>();
+			Map<String, Double> map = new HashMap<String, Double>();
+			
 			for (int j = 0; j < terms.length; j++) {
-				if (terms[i].equals(terms[j])) continue;
-				
+				if (terms[i].equals(terms[j]))
+					continue;
+
 				double countA = 0.0D;
 				double countB = 0.0D;
 				for (String doc : docs) {
 					if (doc.contains(terms[i])) {
 						countA++;
 						doc.replace(terms[i], "");
-						if (doc.contains(terms[j])) countB++;
+						if (doc.contains(terms[j]))
+							countB++;
 					}
 				}
 				if (countA > 0 && countB > 0)
@@ -137,11 +144,16 @@ public class KeywordRelationProcessor {
 				maps.put(terms[i], map);
 			System.out.println("term:" + i);
 		}
-		
-		System.out.println(maps);
+//		System.out.println(maps);
 		return maps;
 	}
-	
+
+	/**
+	 * 
+	 * @param docs
+	 * @param terms
+	 * @return
+	 */
 	public double[][] getRelationMatrix(String[] docs, String[] terms) {
 		double[][] matrix = new double[terms.length][terms.length];
 		for (int i = 0; i < terms.length; i++) {
@@ -150,13 +162,14 @@ public class KeywordRelationProcessor {
 					matrix[j][i] = 0.0D;
 					continue;
 				}
-				
+
 				double countA = 0.0D;
 				double countB = 0.0D;
 				for (String doc : docs) {
 					if (doc.contains(terms[i])) {
 						countA++;
-						if (doc.contains(terms[j])) countB++;
+						if (doc.contains(terms[j]))
+							countB++;
 					}
 				}
 				if (countA == 0)
@@ -167,9 +180,16 @@ public class KeywordRelationProcessor {
 		}
 		return matrix;
 	}
-	
-	public void out(PrintWriter writer, double[][] matrix,
-			String[] colNames, String[] rowNames) {
+
+	/**
+	 * 
+	 * @param writer
+	 * @param matrix
+	 * @param colNames
+	 * @param rowNames
+	 */
+	public void out(PrintWriter writer, double[][] matrix, String[] colNames,
+			String[] rowNames) {
 		writer.print(",");
 		for (int i = 0; i < colNames.length; i++) {
 			writer.print(rowNames[i] + ",");
