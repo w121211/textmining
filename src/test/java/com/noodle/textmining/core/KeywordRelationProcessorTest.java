@@ -22,10 +22,10 @@ public class KeywordRelationProcessorTest extends TestCase {
 		"夏普"
 	};
 	
-	KeywordRelationProcessor tester;
+	TermDependencyProcessor tester;
 	
 	public KeywordRelationProcessorTest() throws FileNotFoundException, IOException {
-		tester = new KeywordRelationProcessor();
+		tester = new TermDependencyProcessor();
 	}
 	
 	@Test

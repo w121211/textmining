@@ -1,37 +1,24 @@
 package com.noodle.textmining.core;
 
-import java.io.FileInputStream;
-import java.util.Properties;
-
 import edu.uci.ics.crawler4j.crawler.CrawlConfig;
 import edu.uci.ics.crawler4j.crawler.CrawlController;
 import edu.uci.ics.crawler4j.fetcher.PageFetcher;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 
-import com.noodle.textmining.core.BasicCrawler;
+import com.noodle.textmining.mission.MissionCrawler;
 
 public class BasicCrawlController {
 
-	public static void main(String[] args) throws Exception {
-
-		// load a properties file
-		Properties prop = new Properties();
-		prop.load(new FileInputStream("config.properties"));
-
-
-		/*
-		 * crawlStorageFolder is a folder where intermediate crawl data is
-		 * stored.
-		 */
-		String crawlStorageFolder = prop.getProperty("CRAWL_STORAGE_FOLDER");
-
-		/*
-		 * numberOfCrawlers shows the number of concurrent threads that should
-		 * crawling.
-		 */
-		int numberOfCrawlers = 5;
-
+	/**
+	 * 
+	 * @param crawlStorageFolder
+	 *            crawlStorageFolder is a folder where intermediate crawl data
+	 *            is stored.
+	 * 
+	 * @return
+	 */
+	public CrawlConfig getConfig(String crawlStorageFolder) {
 		CrawlConfig config = new CrawlConfig();
 		config.setCrawlStorageFolder(crawlStorageFolder);
 
@@ -71,6 +58,22 @@ public class BasicCrawlController {
 		 */
 		config.setResumableCrawling(false);
 
+		return config;
+	}
+
+	/**
+	 * 
+	 * @param crawler 
+	 * @param <T>
+	 * @param config
+	 * @param numberOfCrawlers
+	 *            numberOfCrawlers shows the number of concurrent threads that
+	 *            should crawling.
+	 * @param urlSeeds
+	 * @throws Exception 
+	 */
+	public void startCrawl(MissionCrawler crawler, CrawlConfig config, int numberOfCrawlers,
+			String[] urlSeeds) throws Exception {
 		/*
 		 * Instantiate the controller for this crawl.
 		 */
@@ -86,14 +89,15 @@ public class BasicCrawlController {
 		 * URLs that are fetched and then the crawler starts following links
 		 * which are found in these pages
 		 */
-
-		controller.addSeed(prop.getProperty("DOMAIN"));
+		for (String seed : urlSeeds)
+			controller.addSeed(seed);
 
 		/*
 		 * Start the crawl. This is a blocking operation, meaning that your code
 		 * will reach the line after this only when crawling is finished.
 		 */
-		controller.start(BasicCrawler.class, numberOfCrawlers);
+		System.out.println(crawler.getClass());
+		controller.start(crawler.getClass(), numberOfCrawlers);
 
 		// Wait for 30 seconds
 		Thread.sleep(30 * 1000);
@@ -101,8 +105,6 @@ public class BasicCrawlController {
 		// Send the shutdown request and then wait for finishing
 		controller.Shutdown();
 		controller.waitUntilFinish();
-
-		BasicCrawler.db.close();
-		System.out.println("Crawler shut down");
+		System.out.println("crawler shut down");
 	}
 }

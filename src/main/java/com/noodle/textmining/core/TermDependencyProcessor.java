@@ -21,84 +21,15 @@ import java.util.Properties;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
-public class KeywordRelationProcessor {
-
-	public static void main(String[] args) throws FileNotFoundException,
-			IOException {
-		KeywordRelationProcessor processor = new KeywordRelationProcessor();
-		processor.run();
-		// processor.test();
-		System.out.println("done!");
-	}
-
-	public void test() throws FileNotFoundException, IOException {
-
-		Properties prop = new Properties();
-		prop.load(new FileInputStream("config.properties"));
-		ODatabaseDocumentTx db;
-		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
-				"admin");
-
-		ODocument doc = new ODocument("Test");
-		Map<String, Double> t1 = new HashMap<String, Double>();
-		t1.put("t2", 0.2);
-		t1.put("t3", 0.3);
-
-		doc.field("term", t1);
-		doc.save();
-
-		for (ODocument d : db.browseClass("Test")) {
-			System.out.print(d.fieldType("term"));
-			System.out.println(d.field("term"));
-			Map<String, Double> m = d.field("term");
-			System.out.println(m.get("t2"));
-			System.out.println(m.get("t3"));
-		}
-		db.close();
-	}
-
-	public void run() throws FileNotFoundException, IOException {
-		// load a properties file
-		Properties prop = new Properties();
-		prop.load(new FileInputStream("config.properties"));
-
-		// connect to database
-		ODatabaseDocumentTx db;
-		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
-				"admin");
-		
-		// read terms from file
-		BufferedReader reader = new BufferedReader(new InputStreamReader(
-				new DataInputStream(new FileInputStream(
-						"/Users/chi/Downloads/udn-tkeywords-selected.txt"))));
-		String[] terms = this.getTermsFromFile(reader);
-
-		// read docs from database
-		List<String> list = new ArrayList<String>();
-		for (ODocument doc : db.browseClass("Thread"))
-			list.add((String) doc.field("title"));
-		String[] docs = list.toArray(new String[list.size()]);
-
-		// Compute relation map and save to database
-		for (Map.Entry<String, Map<String, Double>> e : this.getRelationMap(docs,
-				terms).entrySet()) {
-			ODocument doc = new ODocument("Term");
-
-			doc.field("term", e.getKey());
-			doc.field("term_map", e.getValue());
-			doc.save();
-		}
-		db.close();
-	}
+public class TermDependencyProcessor {
 
 	/**
 	 * 
 	 * @param reader
 	 * @return terms
-	 * @throws IOException 
+	 * @throws IOException
 	 */
-	public String[] getTermsFromFile(BufferedReader reader) throws IOException {
-		// read terms from file
+	public String[] getTerms(BufferedReader reader) throws IOException {
 		List<String> list = new ArrayList<String>();
 		String str;
 		while ((str = reader.readLine()) != null) {
@@ -113,6 +44,7 @@ public class KeywordRelationProcessor {
 
 	/**
 	 * TODO bug terms: 專家, 家 cause to count twice
+	 * 
 	 * @param docs
 	 * @param terms
 	 * @return
@@ -122,7 +54,7 @@ public class KeywordRelationProcessor {
 		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
 		for (int i = 0; i < terms.length; i++) {
 			Map<String, Double> map = new HashMap<String, Double>();
-			
+
 			for (int j = 0; j < terms.length; j++) {
 				if (terms[i].equals(terms[j]))
 					continue;
@@ -144,10 +76,23 @@ public class KeywordRelationProcessor {
 				maps.put(terms[i], map);
 			System.out.println("term:" + i);
 		}
-//		System.out.println(maps);
 		return maps;
 	}
 
+	/**
+	 * 
+	 * @param db
+	 * @param className
+	 * @param fieldName
+	 * @return docs
+	 */
+	public String[] getDocs(ODatabaseDocumentTx db, String className, String fieldName) {
+		List<String> list = new ArrayList<String>();
+		for (ODocument doc : db.browseClass(className))
+			list.add((String) doc.field(fieldName));
+		return list.toArray(new String[list.size()]);
+	}
+	
 	/**
 	 * 
 	 * @param docs
@@ -188,7 +133,7 @@ public class KeywordRelationProcessor {
 	 * @param colNames
 	 * @param rowNames
 	 */
-	public void out(PrintWriter writer, double[][] matrix, String[] colNames,
+	public void export(PrintWriter writer, double[][] matrix, String[] colNames,
 			String[] rowNames) {
 		writer.print(",");
 		for (int i = 0; i < colNames.length; i++) {

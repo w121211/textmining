@@ -46,7 +46,7 @@ public class PagerankProcessor {
 		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
 				"admin");
 
-		// Read relation map from database
+		// Read dependency map from database
 		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
 		for (ODocument doc : db.browseClass("Term")) {
 			String term = doc.field("term");
