@@ -63,17 +63,20 @@ public class BasicCrawlController {
 
 	/**
 	 * 
-	 * @param crawler 
+	 * @param crawler
 	 * @param <T>
 	 * @param config
-	 * @param numberOfCrawlers
-	 *            numberOfCrawlers shows the number of concurrent threads that
-	 *            should crawling.
 	 * @param urlSeeds
-	 * @throws Exception 
+	 * @throws Exception
 	 */
-	public void startCrawl(MissionCrawler crawler, CrawlConfig config, int numberOfCrawlers,
+	public void startCrawl(MissionCrawler crawler, CrawlConfig config,
 			String[] urlSeeds) throws Exception {
+		/*
+		 * numberOfCrawlers shows the number of concurrent threads that should
+		 * crawling.
+		 */
+		int numberOfCrawlers = 1;
+
 		/*
 		 * Instantiate the controller for this crawl.
 		 */

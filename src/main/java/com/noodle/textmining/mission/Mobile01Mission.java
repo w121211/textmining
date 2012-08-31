@@ -3,6 +3,9 @@
  */
 package com.noodle.textmining.mission;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -15,19 +18,21 @@ import edu.uci.ics.crawler4j.crawler.Page;
 import edu.uci.ics.crawler4j.parser.HtmlParseData;
 import edu.uci.ics.crawler4j.url.WebURL;
 
-/**
- * @author chi
- * 
- */
-public class Mobile01Mission extends Mission {
+final class Mobile01Mission extends Mission {
+
+	private Mobile01Mission(String missionName, String dbDirectory) {
+		super(missionName, dbDirectory);
+		crawler = new Mobile01Crawler();
+	}
 
 	public static class Mobile01Crawler extends MissionCrawler {
 
 		@Override
 		public boolean shouldVisit(WebURL url) {
 			String href = url.getURL().toLowerCase();
-			return !crawlFilters.matcher(href).matches()
-					&& href.startsWith(crawlDomain);
+			return true;
+//			return !crawlFilters.matcher(href).matches()
+//					&& href.startsWith(Mission.crawlDomain);
 		}
 
 		@Override
@@ -36,23 +41,23 @@ public class Mobile01Mission extends Mission {
 			String url = page.getWebURL().getURL();
 			System.out.println("Docid: " + docid);
 
-			if (url.startsWith(crawlDomain)
+			if (url.startsWith(Mission.crawlDomain)
 					&& page.getParseData() instanceof HtmlParseData) {
 				HtmlParseData htmlParseData = (HtmlParseData) page
 						.getParseData();
 				Document dom = Jsoup.parse(htmlParseData.getHtml());
 				Elements elements = dom.select("div.single-post-content");
 
-				String doc = "";
-				for (Element e : elements) {
-					doc += e.text() + "\n=====\n";
-				}
+				String text = "";
+				for (Element e : elements)
+					text += e.text() + "\n";
 
 				ODatabaseRecordThreadLocal.INSTANCE.set(db);
-				ODocument odoc = new ODocument(crawlDBClassName);
-				odoc.field("url", url);
-				odoc.field(crawlDBFieldName, doc);
-				odoc.save();
+				ODocument doc = new ODocument();
+				doc.field("url", url);
+//				doc.field("title", title);
+				doc.field("text", text);
+				doc.save();
 			}
 		}
 
@@ -63,18 +68,21 @@ public class Mobile01Mission extends Mission {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-
-		Mission.databaseDirectory = "local:/Users/chi/git/textmining/databases/mobile01";
 		Mission.crawlDomain = "http://www.mobile01.com/";
 		String[] urlSeeds = { "http://www.mobile01.com/", };
 		Mission.crawlURLSeeds = urlSeeds;
-		Mission.crawler = new Mobile01Crawler();
+		
+		
 		
 		Code[] missionStack = { 
 				Code.CRAWL_WEB, 
+//				Code.CHINESE_NLP,
+//				Code.TFIDF,
+//				Code.PAGERANK,
 		};
-		Mission mission = new Mobile01Mission();
+		Mission mission = new Mobile01Mission("mobile01", "local:/Users/chi/git/textmining/databases/mobile01");
 		mission.start(missionStack);
+//		Mission.crawler = new Mobile01Crawler();
 		mission.close();
 	}
 }
