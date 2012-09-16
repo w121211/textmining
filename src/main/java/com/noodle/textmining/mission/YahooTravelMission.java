@@ -12,7 +12,7 @@ import edu.uci.ics.crawler4j.crawler.Page;
 import edu.uci.ics.crawler4j.parser.HtmlParseData;
 import edu.uci.ics.crawler4j.url.WebURL;
 
-final class WiredMission extends Mission {
+final class YahooTravelMission extends Mission {
 
 	public static class MissionCrawlerImpl extends MissionCrawler {
 
@@ -30,22 +30,22 @@ final class WiredMission extends Mission {
 			System.out.println("Docid: " + docid);
 
 			// *** Filter urls which need to be processed ************
-			if (url.startsWith(Mission.crawlDomain)
-					&& url.endsWith("index.html")
+			if (url.startsWith(Mission.crawlDomain + "topic/")
 					&& page.getParseData() instanceof HtmlParseData) {
 				// *************************************************
-
 				HtmlParseData htmlParseData = (HtmlParseData) page
 						.getParseData();
 				Document dom = Jsoup.parse(htmlParseData.getHtml());
 
 				// *** Scratch elements inside a page **************
-				Elements titles = dom.select("h2.news_h2");
-				Elements texts = dom.select("div.news_post_content");
-				String title = titles.text();
-				String text = texts.text();
+				Elements titles = dom.select("div.title").select("h2");
+				/*
+				 * TODO bug: text will also contain title
+				 */
+				Elements texts = dom.select("div[class=bd art-content clearfix]");
+				String title = titles.get(0).text();
+				String text = texts.get(0).text();
 				// *************************************************
-
 				if (titles.size() == 1 && texts.size() == 1) {
 					System.out.println("title:" + title);
 					System.out.println("text:" + text);
@@ -65,13 +65,13 @@ final class WiredMission extends Mission {
 		}
 	}
 
-	private WiredMission(String missionName, String dbDirectory) {
+	private YahooTravelMission(String missionName, String dbDirectory) {
 		super(missionName, dbDirectory);
 		// *** (Optional) Change the names for different records ***
 		// *** "index"[DO NOT CHANGE], "name1,name2,name3...." *****
 		dbNameMap.put("crawlFields", "url,title,text");
 		dbNameMap.put("nlpFields", "title,text");
-		dbNameMap.put("pagerankField", "text");
+		dbNameMap.put("pagerankField", "title");
 		// *********************************************
 		crawler = new MissionCrawlerImpl();
 	}
@@ -87,26 +87,19 @@ final class WiredMission extends Mission {
 //				Code.CRAWL_WEB, 	
 //				Code.CHINESE_NLP, 
 //				Code.TFIDF,
-//				Code.PAGERANK,
-				Code.HUB_PAGERANK,
+				Code.PAGERANK,
 		};
 		// *********************************************************
 
 		// *** Initialize a mission ***********
-		Mission.crawlDomain = "http://wired.tw/";
-		Mission mission = new WiredMission("wired",
-				"local:/Users/chi/git/textmining/databases/wired");
+		Mission.crawlDomain = "http://tw.travel.yahoo.com/";
+		Mission mission = new YahooTravelMission("yahootravel",
+				"local:/Users/chi/git/textmining/databases/yahootravel");
 		mission.maxPagerankTermNumber = 2000;
-		mission.minDependencyDocsNumber = 100;
-		String[] urlSeeds = { "http://wired.tw/", };
+		String[] urlSeeds = { "http://tw.travel.yahoo.com/info", };
 		mission.crawlURLSeeds = urlSeeds;
-		mission.hubsPath = "export/wired_hubs.txt";
-		mission.terminalsPath = "export/wired_terminals.txt";
 		// *********************************************************
 
-		mission.init();
-		
-//		mission.createTerminals(1000);
 		mission.start(missionStack);
 		mission.close();
 	}

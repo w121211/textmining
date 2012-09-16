@@ -1,4 +1,4 @@
-package com.noodle.textmining;
+package com.noodle.textmining.core;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

@@ -22,7 +22,7 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 public abstract class Mission {
 
 	protected enum Code {
-		CHINESE_NLP, CRAWL_WEB, PAGERANK, REMOVE_DB, TFIDF,
+		CHINESE_NLP, CRAWL_WEB, HUB_PAGERANK, PAGERANK, REMOVE_DB, TFIDF,
 	}
 
 	protected static String crawlDomain;
@@ -34,8 +34,14 @@ public abstract class Mission {
 	protected MissionCrawler crawler;
 	protected String[] crawlURLSeeds;
 	protected int maxPagerankTermNumber;
+	protected int minDependencyDocsNumber;
+	protected String filterAnyTermsPath;
+	protected String filterExactTermsPath;
+	protected String hubsPath;
 	protected String missionName;
-	protected String tfidfFileDirectory;
+	protected String terminalsPath;
+	protected String tfidfPath;
+	
 
 	public Mission(String missionName, String dbDirectory) {
 		this.missionName = missionName;
@@ -80,6 +86,57 @@ public abstract class Mission {
 	}
 
 	/**
+	 * Create a terminal file '{mission_name}_terminals.txt' under the export
+	 * directory. It uses tfidfTerms, select the first 'terminalNumber' (e.g.
+	 * 1000) terms with excluding of hubs and filtering junk words.
+	 * 
+	 * @param terminalNumber
+	 * @throws IOException
+	 */
+	public void createTerminals(int terminalNumber) throws IOException {
+		String[] terms = this.getTerms(tfidfPath, ":");
+
+		List<String> terminals = new ArrayList<String>();
+		for (String term : terms) {
+			if (terminals.size() > terminalNumber)
+				break;
+			Pattern filter = Pattern.compile(this
+					.getAnyFilter(filterAnyTermsPath)
+					+ "|"
+					+ this.getExactFilter(filterExactTermsPath)
+					+ "|"
+					+ this.getExactFilter(hubsPath));
+			if (!filter.matcher(term).matches())
+				terminals.add(term);
+		}
+		System.out.println(terminals);
+
+		BufferedWriter writer = this.getBufferedWriter(terminalsPath);
+		for (String terminal : terminals) {
+			writer.write(terminal + "\n");
+
+		}
+		writer.flush();
+	}
+
+	private String getAnyFilter(String filePath) throws IOException {
+		String regexp = getExactFilter(filePath);
+		return "(.*" + regexp + ".*)";
+	}
+
+	private BufferedReader getBufferedReader(String filePath)
+			throws FileNotFoundException {
+		return new BufferedReader(new InputStreamReader(new DataInputStream(
+				new FileInputStream(filePath))));
+	}
+
+	private BufferedWriter getBufferedWriter(String filePath)
+			throws FileNotFoundException {
+		return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(
+				filePath)));
+	}
+
+	/**
 	 * 
 	 * @param db
 	 * @param className
@@ -94,6 +151,50 @@ public abstract class Mission {
 				list.add((String) doc.field(fieldName));
 		}
 		return list;
+	}
+
+	private String getExactFilter(String filePath) throws IOException {
+		String regexp = "";
+		BufferedReader reader = getBufferedReader(filePath);
+		String str;
+		while ((str = reader.readLine()) != null)
+			regexp += str + "|";
+		if (regexp.length() > 0)
+			return "(" + regexp.substring(0, regexp.length() - 1) + ")";
+		else
+			return "";
+	}
+
+	public String[] getTerms(String filePath, String stopString)
+			throws IOException {
+		BufferedReader reader = this.getBufferedReader(filePath);
+		List<String> list = new ArrayList<String>();
+		String str;
+		while ((str = reader.readLine()) != null) {
+			if (stopString == null) {
+				list.add(str);
+			} else {
+				if (str.indexOf(":") > 0) {
+					String s = str.substring(0, str.indexOf(stopString));
+					// if (s.length() > 1 && s.matches("[\\S&&[^╱，.]]{2,}?"))
+					if (s.length() > 0)
+						list.add(s);
+				}
+			}
+		}
+		return list.toArray(new String[list.size()]);
+	}
+
+	public void init() {
+		if (tfidfPath == null)
+			tfidfPath = exportDirectory + missionName + "_"
+					+ dbNameMap.get("pagerankField") + "_tfidf.txt";
+		if (filterAnyTermsPath == null)
+			filterAnyTermsPath = "data/filter_any_terms.txt";
+		if (filterExactTermsPath == null)
+			filterExactTermsPath = "data/filter_exact_terms.txt";
+		if (minDependencyDocsNumber == 0)
+			minDependencyDocsNumber = 100;
 	}
 
 	/**
@@ -120,6 +221,32 @@ public abstract class Mission {
 				controller.getConfig(crawlStorageFolder), crawlURLSeeds);
 	}
 
+	@SuppressWarnings("unchecked")
+	public void runHubPagerank() throws IOException {
+		if (hubsPath == null)
+			throw new FileNotFoundException(
+					"String:hubsPath need to be specify");
+		if (terminalsPath == null)
+			throw new FileNotFoundException(
+					"String:terminalsPath need to be specify");
+		String[] hubs = this.getTerms(hubsPath, null);
+		String[] terminals = this.getTerms(terminalsPath, null);
+		List<String> docs = this.getDocs(db, dbNameMap.get("crawlClass"),
+				dbNameMap.get("pagerankField"));
+
+		TermDependencyProcessor depProc = new TermDependencyProcessor();
+		Map<String, Map<String, Double>> maps = depProc.getDependencyMaps(hubs,
+				terminals, docs, minDependencyDocsNumber);
+		
+		System.out.println(maps);
+		PagerankProcessor pgProc = new PagerankProcessor();
+		BufferedWriter writer = this.getBufferedWriter(exportDirectory
+				+ missionName + "_" + dbNameMap.get("pagerankField")
+				+ "_hubpagerank.dot");
+		pgProc.exportGraph(writer,
+				pgProc.getPagerankGraph(pgProc.getTermGraph(maps)));
+	}
+
 	/**
 	 * 
 	 * @throws FileNotFoundException
@@ -127,12 +254,7 @@ public abstract class Mission {
 	 */
 	@SuppressWarnings("unchecked")
 	public void runTermPagerank() throws FileNotFoundException, IOException {
-		if (tfidfFileDirectory == null)
-			tfidfFileDirectory = exportDirectory + missionName + "_"
-					+ dbNameMap.get("pagerankField") + "_tfidf.txt";
-		BufferedReader reader = new BufferedReader(new InputStreamReader(
-				new DataInputStream(new FileInputStream(tfidfFileDirectory))));
-
+		BufferedReader reader = this.getBufferedReader(tfidfPath);
 		TermDependencyProcessor depProc = new TermDependencyProcessor();
 		PagerankProcessor pgProc = new PagerankProcessor();
 
@@ -143,12 +265,11 @@ public abstract class Mission {
 				terms, docs, maxPagerankTermNumber);
 		System.out.println("read " + terms.length + " terms");
 
-		BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream(exportDirectory + missionName + "_"
-						+ dbNameMap.get("pagerankField") + "_pagerank.dot")));
+		BufferedWriter writer = this.getBufferedWriter(exportDirectory
+				+ missionName + "_" + dbNameMap.get("pagerankField")
+				+ "_pagerank.dot");
 		pgProc.exportGraph(writer,
 				pgProc.getPagerankGraph(pgProc.getTermGraph(maps)));
-
 	}
 
 	/**
@@ -204,8 +325,12 @@ public abstract class Mission {
 				this.runTermTfidf();
 				break;
 			case PAGERANK:
-				System.out.println("start mission: term pagerank");
+				System.out.println("start mission: general pagerank");
 				this.runTermPagerank();
+				break;
+			case HUB_PAGERANK:
+				System.out.println("start mission: hub pagerank");
+				this.runHubPagerank();
 				break;
 			default:
 				break;

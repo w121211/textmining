@@ -47,15 +47,15 @@ public class TermDependencyProcessor {
 	}
 
 	/**
+	 * get dependency(termA->termB). Dependency(termA->termB) = number of docs
+	 * contain (termA & termB) / number of docs contain (termA). The probability
+	 * of termB exist when termA exist.
 	 * 
-	 * @param term1
-	 * @param term2
-	 * @param docs
-	 * @return dependency(termA -> termB). The probability of termB will coexist
-	 *         when termA is exist in some document. If termA is not exist in
-	 *         all docs, ....
+	 * @param docsContainsTermA
+	 * @param termB
+	 * @return dependency(termA->termB).
 	 */
-	public double getDependency(List<String> docsContainsTermA, String termB) {
+	private double getDependency(List<String> docsContainsTermA, String termB) {
 		double countA = docsContainsTermA.size();
 		double countB = 0D;
 		for (String doc : docsContainsTermA) {
@@ -65,6 +65,55 @@ public class TermDependencyProcessor {
 		if (countA > 0 && countB > 0)
 			return countB / countA;
 		return 0D;
+	}
+	
+	/**
+	 * get dependency(termA->termB). Dependency(termA->termB) = number of docs
+	 * contain (termA & termB) / number of docs contain (termA). The probability
+	 * of termB exist when termA exist.
+	 * 
+	 * @param docsContainsTermA
+	 * @param termB
+	 * @return dependency(termA->termB).
+	 */
+	public double getDependency(List<String> docsContainsTermA, String termB, int minDocsRequire) {
+		if (minDocsRequire == 0)
+			return getDependency(docsContainsTermA, termB);
+		double weight = (double) docsContainsTermA.size() / (double) minDocsRequire;
+		if (weight > 1.0)
+			weight = 1.0;
+		return weight * getDependency(docsContainsTermA, termB);
+	}
+
+	/**
+	 * Compute dependency map with given hubs and terminals. The return map will
+	 * only contain dependency(terminal->hub) but not dependency(hub->terminal),
+	 * (terminal->terminal), nor (hub->hub)
+	 * 
+	 * @param hubs
+	 * @param terminals
+	 * @param docs
+	 * @return dependency(terminal->hub) map
+	 */
+	public Map<String, Map<String, Double>> getDependencyMaps(String[] hubs,
+			String[] terminals, List<String> docs, int minDocsRequire) {
+		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
+		for (String terminal : terminals) {
+			Map<String, Double> map = new HashMap<String, Double>();
+			List<String> docsContainsTerminal = this.getDocsContainsTerm(terminal,
+					docs);
+			for (String hub: hubs) {
+				double dependency = this.getDependency(docsContainsTerminal,
+						hub, minDocsRequire);
+				if (dependency > 0)
+					map.put(hub, dependency);
+			}
+			if (map.size() > 0) {
+				maps.put(terminal, map);
+			}
+			System.out.println("term:" + terminal);
+		}
+		return maps;
 	}
 
 	/**

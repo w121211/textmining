@@ -1,35 +1,20 @@
 package com.noodle.textmining.core;
 
-import java.io.BufferedWriter;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
 
 import org.jgrapht.Graph;
 import org.jgrapht.ext.ComponentAttributeProvider;
 import org.jgrapht.ext.DOTExporter;
 import org.jgrapht.ext.IntegerNameProvider;
+import org.jgrapht.ext.StringNameProvider;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
-import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
-import com.orientechnologies.orient.core.record.impl.ODocument;
-
 public class PagerankProcessor {
-
-	public static void main(String[] args) throws FileNotFoundException,
-			IOException {
-		PagerankProcessor app = new PagerankProcessor();
-		app.run();
-		System.out.println("done!");
-	}
 
 	public void exportGraph(Writer writer,
 			final Graph<TermVertex, DefaultWeightedEdge> g)
@@ -47,7 +32,10 @@ public class PagerankProcessor {
 			public Map<String, String> getComponentAttributes(
 					DefaultWeightedEdge e) {
 				Map<String, String> map = new HashMap<String, String>();
-				map.put("label", String.format("%.6f", g.getEdgeWeight(e)));
+				map.put("label",
+						String.format("%s->%s %.6f", g.getEdgeSource(e),
+								g.getEdgeTarget(e), g.getEdgeWeight(e)));
+				map.put("weight", String.format("%.6f", g.getEdgeWeight(e)));
 				return map;
 			}
 		};
@@ -80,7 +68,7 @@ public class PagerankProcessor {
 						// sigma += j.getPagerank() / g.outDegreeOf(j);
 						/* dependency pagerank */
 						dependenceSum += g.getEdgeWeight(ek);
-						sigma += j.getPagerank()
+					sigma += j.getPagerank()
 							* (g.getEdgeWeight(ej) / dependenceSum);
 				}
 				double pr = (1d - damping) / n + damping * sigma;
@@ -93,18 +81,20 @@ public class PagerankProcessor {
 	}
 
 	public DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge> getTermGraph(
-			Map<String, Map<String, Double>> termRelationMap) {
-
-		// Create relation graph
+			Map<String, Map<String, Double>> maps) {
 		Map<String, TermVertex> map = new HashMap<String, TermVertex>();
 		DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge> g = new DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge>(
 				DefaultWeightedEdge.class);
-		for (String term : termRelationMap.keySet()) {
-			TermVertex v = new TermVertex(term);
-			g.addVertex(v);
-			map.put(v.getTerm(), v);
+
+		for (Entry<String, Map<String, Double>> e1 : maps.entrySet()) {
+			map.put(e1.getKey(), new TermVertex(e1.getKey()));
+			for (Entry<String, Double> e2 : e1.getValue().entrySet())
+				map.put(e2.getKey(), new TermVertex(e2.getKey()));
 		}
-		for (Entry<String, Map<String, Double>> e1 : termRelationMap.entrySet()) {
+		for (TermVertex v : map.values())
+			g.addVertex(v);
+
+		for (Entry<String, Map<String, Double>> e1 : maps.entrySet()) {
 			for (Entry<String, Double> e2 : e1.getValue().entrySet()) {
 				DefaultWeightedEdge e = g.addEdge(map.get(e1.getKey()),
 						map.get(e2.getKey()));
@@ -112,32 +102,6 @@ public class PagerankProcessor {
 			}
 		}
 		return g;
-	}
-
-	@SuppressWarnings("unchecked")
-	public void run() throws FileNotFoundException, IOException {
-		Properties prop = new Properties();
-		prop.load(new FileInputStream("config.properties"));
-		ODatabaseDocumentTx db;
-		db = new ODatabaseDocumentTx(prop.getProperty("DB_DIR")).open("admin",
-				"admin");
-
-		// Read dependency map from database
-		Map<String, Map<String, Double>> maps = new HashMap<String, Map<String, Double>>();
-		for (ODocument doc : db.browseClass("Term")) {
-			String term = doc.field("term");
-			Map<String, Double> map = doc.field("term_map");
-			maps.put(term, map);
-		}
-
-		DefaultDirectedWeightedGraph<TermVertex, DefaultWeightedEdge> g = this
-				.getTermGraph(maps);
-		g = this.getPagerankGraph(g);
-
-		BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream(prop.getProperty("EXPORT_DIR")
-						+ "relation_graph.dot")));
-		this.exportGraph(writer, g);
 	}
 }
 
@@ -177,6 +141,6 @@ class TermVertex {
 	}
 
 	public String toString() {
-		return String.format("%s[%.6f]", term, pagerank);
+		return term;
 	}
 }
